@@ -15,6 +15,8 @@ Learning GO with testing from <a href="https://quii.gitbook.io/learn-go-with-tes
 
 ## **Useful things to remember**
 
+- In Go if a symbol (variables, types, functions et al) starts with a lowercase symbol then it is private outside the package it's defined in.
+
 <br>
 
 ## **Folders**
@@ -82,7 +84,7 @@ type Shape interface {
 }
 ```
 
-**!** Normally in other languages you have to specifically say `MyType Rectangle implements Shape` but in Go's case:
+**!!!** Normally in other languages you have to specifically say `MyType Rectangle implements Shape` but in Go's case:
 
 - `Rectangle` has a method called `Area()` that returns a `float64` so it satisfies the `Shape` interface
 - Same goes for `Circle`
@@ -92,3 +94,17 @@ In Go **_Interface resolution is implicit_**. If the type you pass in matches wh
 <br>
 
 ### **Pointers & Errors**
+
+`nil` is synonymous with `null` from other programming languages.
+
+Errors can be `nil` if the return type of a function is `error` (which is an interface)
+
+If you see a function that takes arguments or returns values that are interfaces, they can be _nillable_
+
+Just like `null` if you try to access a value that is `nil` it will throw a runtime panic.
+
+**!!!** Make sure to check for nils.
+
+<br>
+
+Go copies values when you pass them to functions/methods, so if you're writing a function that needs to mutate state you'll need it to take a pointer to the thing you want to change.
