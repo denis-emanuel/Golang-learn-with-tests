@@ -12,6 +12,21 @@ Learning GO with testing from <a href="https://quii.gitbook.io/learn-go-with-tes
         - [Example](#example)
       - [**Interfaces**](#interfaces)
     - [**Pointers & Errors**](#pointers--errors)
+    - [**Dependency Injection**](#dependency-injection)
+    - [**Concurrency**](#concurrency)
+      - [Anonymous function example to start a gorouting](#anonymous-function-example-to-start-a-gorouting)
+      - [Anonymous function features](#anonymous-function-features)
+      - [Quick note on parallelism and a small problem](#quick-note-on-parallelism-and-a-small-problem)
+      - [Another problem on **_DATA RACE_**](#another-problem-on-data-race)
+      - [Solution: Channels](#solution-channels)
+  - [Select](#select)
+    - [Select](#select-1)
+      - [defer](#defer)
+      - [select](#select-2)
+      - [httptest](#httptest)
+  - [Sync](#sync)
+    - [WaitGroup](#waitgroup)
+    - [MUTEX](#mutex)
 
 ## **Useful things to remember**
 
@@ -108,3 +123,170 @@ Just like `null` if you try to access a value that is `nil` it will throw a runt
 <br>
 
 Go copies values when you pass them to functions/methods, so if you're writing a function that needs to mutate state you'll need it to take a pointer to the thing you want to change.
+
+<br>
+
+### **Dependency Injection**
+
+- You don't need a framework
+- It does not overcomplicate your design
+- It facilitates testing
+- It allows you to write great, general-purpose functions.
+
+Assume we have this function
+
+```go
+func Greet(name string) {
+	fmt.Printf("Hello, %s", name)
+}
+```
+
+How can we test it because `fmt.Printf` prints to stdout and it's pretty hard for us to capture using the testing framework.
+
+We need to be able to **inject** (pass in) the dependency of printing
+
+Our function doesn't need to care where or how the printing happens, so we should accept an interface rather than a concrete type and by doing that we can change the implementation to print something we control so that we can test it.
+
+<br>
+
+### **Concurrency**
+
+To tell go to start a `goroutine` we turn a function call into a `go` statement by putting the `go` in front of it like `go doSomething()`
+
+And because of that we often use _anonymous functions_ when we want to start a goroutine.
+
+<br>
+
+#### Anonymous function example to start a gorouting
+
+```go
+results := make(map[string]bool)
+
+for _, url := range urls {
+	go func() { //Anonymous function
+		results[url] = wc(url)
+	}()
+}
+```
+
+#### Anonymous function features
+
+- they can be executed at the same time they are declared (notice the "()" at the end of the declaration)
+- they maintain access to the lexical scope they are defined in
+
+<br>
+
+#### Quick note on parallelism and a small problem
+
+If we run a routine like this in a for loop:
+
+```go
+results := make(map[string]bool)
+
+for _, url := range urls {
+	go func() {
+  	results[url] = wc(url)
+	}()
+}
+
+return results
+```
+
+none of the goroutines in the for loop have enough time to add their result to the `results` map because the `wc` function is too fast for them and it returns an empty array.
+
+So we can add a wait to wait until the goroutines do their work and then return. So we can add this code in between the `anonymous function` call and the `return` statement.
+
+```go
+time.Sleep(2 * time.Second)
+```
+
+But this option has another flaw. It displays only one result in the `result` map.
+The problem is that the `url` is reused for each iteration of the `for` loop.
+
+Each goroutines has a reference to the `url` variable, they don't have their own independent copy. And so, they are all writing the value that `url` has at the end of the iteration.
+
+_How to fix_:
+
+```go
+results := make(map[string]bool)
+
+for _, url := range urls {
+	go func(u string) {
+		results[u] = wc(u)
+	}(url)
+}
+
+time.Sleep(2 * time.Second)
+
+return results
+```
+
+In this solution we give each anonymous function a parameter for the url called `u` and we instantly call them with the `url` as an argument.
+
+Thus we make sure that the value of `u` is fixed as the value of `url` for the iteration of the loop that we're launching the goroutine in.
+
+`u` is a copy value of `url` and so can't be changed.
+
+<br>
+
+#### Another problem on **_DATA RACE_**
+
+Sometimes, when we run our tests, two of the goroutines write to the results map at exactly the same time. Maps in Go don't like this so -> **fatal error**
+
+<br>
+
+#### Solution: Channels
+
+We can coordinate our goroutines using _channels_.  
+_Channels_ are a Go data structure that can both receive and send values. These operations allow for communication between different processes.
+
+For example we can think about the communication between the parent process and each of the goroutines.
+
+<br>
+
+## Select
+
+### Select
+
+#### defer
+
+By prefixing a function with _defer_ it will now call that function at the end of the containing function.
+
+For example you may want to close an open port and have that code written whever you opened the port for better readability.
+
+<br>
+
+#### select
+
+It's a construct which helps us synchronize processes really easily and clearly.  
+_Select_ lets you wait on multiple channels. The first one to send a value wins and the code underneath the `case` is executed
+
+<br>
+
+#### httptest
+
+A convenient way of creating test servers so you can have realiable and controllable tests
+
+<br>
+
+## Sync
+
+How to make a counter that is safe to use in a concurrent environment.
+
+<br>
+
+### WaitGroup
+
+A WaitGroup waits for a collection of goroutines to finish. The main goroutine calls `Add` to set the number of goroutines to wait for. Then each of the goroutines runs and calls `Done` when finished. At the same time, `Wait` can be used to block until all goroutines have finished.
+
+<br>
+
+### MUTEX
+
+Allows us to add locks to our data.
+
+**!!!** A mutex must not be copied after first use.
+
+A _Mutex_ is a mutual exclusion lock. The zero value for a Murex is an unlocked mutex.
+
+For a good example on how to use this go to [this code](Sync/sync.go) and check the comments for the mutex.
